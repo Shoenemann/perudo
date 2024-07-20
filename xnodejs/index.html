@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perudo Game</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <a class="navbar-brand" href="#">Perudo</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item active">
+                    <a class="nav-link" href="#">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="create_game.html">Crea Partita</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-12">
+                <h2>Partite Disponibili</h2>
+                <ul id="gamesList" class="list-group">
+                    <!-- Lista delle partite disponibili -->
+                </ul>
+            </div>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <h2>Registrazione</h2>
+                <div class="input-group mb-3">
+                    <input id="nicknameInput" type="text" class="form-control" placeholder="Inserisci il tuo nickname">
+                    <div class="input-group-append">
+                        <button id="registerButton" class="btn btn-success" type="button">Registrati</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Players Section -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <h3>Giocatori</h3>
+                <ul id="playersList" class="list-group">
+                    <!-- Lista dei giocatori online -->
+                </ul>
+            </div>
+
+            <!-- Rank Section -->
+            <div class="col-md-6">
+                <h3>Rank dei Giocatori</h3>
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Giocatore</th>
+                            <th>Punti</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Chat Section -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <h3>Chat</h3>
+                <div class="card">
+                    <div class="card-body">
+                        <ul id="messages" class="list-unstyled">
+                            <!-- Cronologia dei messaggi -->
+                        </ul>
+                    </div>
+                    <div class="card-footer">
+                        <div class="input-group">
+                            <input id="messageInput" type="text" class="form-control" placeholder="Scrivi un messaggio...">
+                            <div class="input-group-append">
+                                <button id="sendButton" class="btn btn-primary" type="button">Invia</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        let nickname = '';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedNickname = localStorage.getItem('nickname');
+            if (savedNickname) {
+                nickname = savedNickname;
+                document.getElementById('nicknameInput').value = nickname;
+                document.getElementById('nicknameInput').disabled = true;
+                document.getElementById('registerButton').disabled = true;
+                socket.emit('register', nickname);
+            }
+        });
+
+        const nicknameInput = document.getElementById('nicknameInput');
+        const registerButton = document.getElementById('registerButton');
+        const messageInput = document.getElementById('messageInput');
+        const messages = document.getElementById('messages');
+        const sendButton = document.getElementById('sendButton');
+        const playersList = document.getElementById('playersList');
+        const gamesList = document.getElementById('gamesList');
+
+        registerButton.addEventListener('click', () => {
+            const nick = nicknameInput.value;
+            if (nick) {
+                nickname = nick;
+                nicknameInput.disabled = true;
+                registerButton.disabled = true;
+                localStorage.setItem('nickname', nickname); // Save nickname
+                socket.emit('register', nickname);
+                alert(`Benvenuto, ${nickname}!`);
+            }
+        });
+
+        sendButton.addEventListener('click', () => {
+            const msg = messageInput.value;
+            if (msg && nickname) {
+                socket.emit('chat message', { nickname, msg });
+                messageInput.value = '';
+            } else if (!nickname) {
+                alert('Per favore, registrati prima di inviare messaggi.');
+            }
+        });
+
+        socket.on('init', (data) => {
+            // Aggiorna la cronologia della chat
+            data.chatHistory.forEach(chat => {
+                const item = document.createElement('li');
+                item.innerHTML = `<strong>${chat.nickname}:</strong> ${chat.msg}`;
+                messages.appendChild(item);
+            });
+            // Aggiorna l'elenco dei giocatori
+            updatePlayersList(data.players);
+            // Aggiorna l'elenco delle partite
+            updateGamesList(data.games);
+        });
+
+        socket.on('chat message', (data) => {
+            const item = document.createElement('li');
+            item.innerHTML = `<strong>${data.nickname}:</strong> ${data.msg}`;
+            messages.appendChild(item);
+        });
+
+        socket.on('update players', (players) => {
+            updatePlayersList(players);
+        });
+
+        socket.on('update games', (games) => {
+            updateGamesList(games);
+        });
+
+        function updatePlayersList(players) {
+            playersList.innerHTML = '';
+            players.sort().forEach(player => {
+                const item = document.createElement('li');
+                item.className = 'list-group-item';
+                item.textContent = player;
+                playersList.appendChild(item);
+            });
+        }
+
+        function updateGamesList(games) {
+            gamesList.innerHTML = '';
+            games.forEach(game => {
+                if (!game.started) {
+                    const item = document.createElement('li');
+                    item.className = 'list-group-item';
+                    item.innerHTML = `<strong>${game.host}</strong> (${game.players.length}/${game.maxPlayers} giocatori) - <a href="lobby.html?gameId=${game.id}">Entra</a>`;
+                    gamesList.appendChild(item);
+                }
+            });
+        }
+    </script>
+</body>
+</html>

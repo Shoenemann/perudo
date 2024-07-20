@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lobby</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .ready-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <a class="navbar-brand" href="#">Perudo</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="index.html">Home</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8">
+                <h2>Lobby</h2>
+                <div>
+                    <h3>Partecipanti</h3>
+                    <ul id="participantsList" class="list-group">
+                        <!-- Lista dei partecipanti -->
+                    </ul>
+                </div>
+                <div class="mt-4">
+                    <h3>Chat</h3>
+                    <div class="card">
+                        <div class="card-body">
+                            <ul id="messages" class="list-unstyled">
+                                <!-- Cronologia dei messaggi -->
+                            </ul>
+                        </div>
+                        <div class="card-footer">
+                            <div class="input-group">
+                                <input id="messageInput" type="text" class="form-control" placeholder="Scrivi un messaggio...">
+                                <div class="input-group-append">
+                                    <button id="sendButton" class="btn btn-primary" type="button">Invia</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <button id="readyButton" class="btn btn-success">Sono Pronto</button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <h3>Giocatori Pronti</h3>
+                <ul id="readyList" class="list-group ready-list">
+                    <!-- Lista dei giocatori pronti -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const urlParams = new URLSearchParams(window.location.search);
+        const gameId = urlParams.get('gameId');
+
+        let nickname = '';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            nickname = localStorage.getItem('nickname');
+            if (nickname) {
+                socket.emit('join game', { gameId, nickname });
+            } else {
+                alert('Per favore, registrati prima di partecipare a una partita.');
+                window.location.href = 'index.html';
+            }
+        });
+
+        const messageInput = document.getElementById('messageInput');
+        const messages = document.getElementById('messages');
+        const sendButton = document.getElementById('sendButton');
+        const participantsList = document.getElementById('participantsList');
+        const readyButton = document.getElementById('readyButton');
+        const readyList = document.getElementById('readyList');
+
+        sendButton.addEventListener('click', () => {
+            const msg = messageInput.value;
+            if (msg) {
+                socket.emit('game chat message', { gameId, nickname, msg });
+                messageInput.value = '';
+            }
+        });
+
+        readyButton.addEventListener('click', () => {
+            socket.emit('player ready', { gameId, nickname });
+        });
+
+        socket.on('chat message', (data) => {
+            const item = document.createElement('li');
+            item.innerHTML = `<strong>${data.nickname}:</strong> ${data.msg}`;
+            messages.appendChild(item);
+        });
+
+        socket.on('update participants', (participants) => {
+            participantsList.innerHTML = '';
+            participants.forEach(participant => {
+                const item = document.createElement('li');
+                item.className = 'list-group-item';
+                item.textContent = participant;
+                participantsList.appendChild(item);
+            });
+        });
+
+        socket.on('update ready list', (readyPlayers) => {
+            readyList.innerHTML = '';
+            readyPlayers.forEach(player => {
+                const item = document.createElement('li');
+                item.className = 'list-group-item';
+                item.textContent = player;
+                readyList.appendChild(item);
+            });
+        });
+
+        socket.on('game start countdown', () => {
+            alert('La partita inizierà tra 10 secondi!');
+            setTimeout(() => {
+                window.location.href = `game.html?gameId=${gameId}`;
+            }, 10000);
+        });
+    </script>
+</body>
+</html>
